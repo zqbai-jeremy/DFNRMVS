@@ -1,0 +1,12 @@
+pytorch
+torchvision
+numpy
+scipy
+matplotlib
+cython
+tqdm
+scikit-image
+rtree
+numba
+colorama
+opencv

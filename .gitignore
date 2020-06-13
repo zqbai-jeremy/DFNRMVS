@@ -1,0 +1,4 @@
+# Default ignored files
+.idea
+external/
+net_weights/
