@@ -3,4 +3,4 @@ trimesh
 pyrender
 pytube
 tinyobjloader
-pillow==6.1
+pillow
