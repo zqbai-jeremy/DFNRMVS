@@ -66,3 +66,5 @@ python demo.py
 - All images in the input directory will be used for reconstruction. Per-view results will be saved to the output directory.
 
 - Some examples are in "\<DFNRMVS directory\>/examples/". The corresponding outputs are in "\<DFNRMVS directory\>/out_dir/".
+
+- The model usually gives good results for 2 views input with +-30 degree yaw angles.
