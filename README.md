@@ -68,3 +68,22 @@ python demo.py
 - Some examples are in "\<DFNRMVS directory\>/examples/". The corresponding outputs are in "\<DFNRMVS directory\>/out_dir/".
 
 - The model usually gives good results for 2 views input with +-30 degree yaw angles.
+
+
+## Training
+
+- Training requires 256x256 images with ground truth 3D scans. Loss functions and training parameters are provided in "\<DFNRMVS directory\>/train/losses.py"
+
+- Need to setup [torch-batch-svd](https://github.com/KinglittleQ/torch-batch-svd) to use the losses.
+
+## Citation
+
+```
+@inproceedings{bai2020deep,
+  title={Deep Facial Non-Rigid Multi-View Stereo},
+  author={Bai, Ziqian and Cui, Zhaopeng and Rahim, Jamal Ahmed and Liu, Xiaoming and Tan, Ping},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={5850--5860},
+  year={2020}
+}
+```

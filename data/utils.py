@@ -7,6 +7,7 @@ from PIL import Image
 # External libs
 import external.deep_head_pose.code.hopenet as hopenet
 import external.deep_head_pose.code.utils as hopenet_utils
+from torch_batch_svd import svd as batch_svd
 
 # Internal libs
 from core_3dv.camera_operator import x_2d_coords, pi_inv, transpose
@@ -130,6 +131,8 @@ def get_head_pose_by_DeepHeadPose(model, img):
 
 def procrustes(X, Y, scaling=True, reflection='best'):
     """
+    Code from https://github.com/patrikhuber/fg2018-competition/blob/master/compute_vertices_to_mesh_distances.py
+
     A port of MATLAB's `procrustes` function to Numpy.
     Code from: https://stackoverflow.com/a/18927641.
     Procrustes analysis determines a linear transformation (translation,
@@ -225,6 +228,75 @@ def procrustes(X, Y, scaling=True, reflection='best'):
     if my < m:
         T = T[:my, :]
     c = muX - b * np.dot(muY, T)
+
+    # transformation values
+    tform = {'rotation': T, 'scale': b, 'translation': c}
+
+    return d, Z, tform
+
+
+def batched_procrustes_pytorch(X, Y, scaling=True, reflection='best'):
+    N, n, m = X.shape
+    Ny, ny, my = Y.shape
+    assert my == m and N == Ny
+
+    muX = torch.mean(X, dim=1, keepdim=True)
+    muY = torch.mean(Y, dim=1, keepdim=True)
+
+    X0 = X - muX
+    Y0 = Y - muY
+
+    ssX = torch.sum(torch.sum(X0 ** 2., dim=2, keepdim=True), dim=1, keepdim=True)      # (N, 1, 1)
+    ssY = torch.sum(torch.sum(Y0 ** 2., dim=2, keepdim=True), dim=1, keepdim=True)      # (N, 1, 1)
+
+    # centred Frobenius norm
+    normX = torch.sqrt(ssX)
+    normY = torch.sqrt(ssY)
+
+    # scale to equal (unit) norm
+    X0 = X0 / normX
+    Y0 = Y0 / normY
+
+    # optimum rotation matrix of Y
+    A = torch.bmm(torch.transpose(X0, 1, 2), Y0)
+
+    # U, s, V = torch.svd(A, some=True)
+    U, s, V = batch_svd(A)
+    T = torch.bmm(V, torch.transpose(U, 1, 2))          # (N, 3, 3)
+
+    if reflection is not 'best':
+
+        # does the current solution use a reflection?
+        deter = torch.det(T)                            # (N,)
+        have_reflection = torch.lt(deter, 0)            # (N,)
+
+        # if that's not what was specified, force another reflection
+        V_ref = V.clone()
+        V_ref[:, :, -1] *= -1
+        s_ref = s.clone()
+        s_ref[:, -1] *= -1
+        T_ref = torch.bmm(V_ref, torch.transpose(U, 1, 2))  # (N, 3, 3)
+        ref_mask = torch.ne(have_reflection.float(), float(reflection))
+        s = torch.where(ref_mask.view(N, 1).expand(N, 3), s_ref, s)
+        T = torch.where(ref_mask.view(N, 1, 1).expand(N, 3, 3), T_ref, T)
+
+    traceTA = torch.sum(s, dim=1).view(N, 1, 1)         # (N, 1, 1)
+
+    if scaling:
+        # optimum scaling of Y
+        b = traceTA * normX / normY
+
+        # standarised distance between X and b*Y*T + c
+        d = 1 - traceTA ** 2
+
+        # transformed coords
+        Z = normX * traceTA * torch.bmm(Y0, T) + muX          # (N, n, 3)
+    else:
+        b = torch.ones_like(traceTA)
+        d = 1 + ssY / ssX - 2 * traceTA * normY / normX
+        Z = normY * torch.bmm(Y0, T) + muX
+
+    c = muX - b * torch.bmm(muY, T)                       # (N, 1, 3)
 
     # transformation values
     tform = {'rotation': T, 'scale': b, 'translation': c}
